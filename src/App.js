@@ -179,8 +179,8 @@ const App = () => {
   const writingToPeripheral = async () => {
     const peripheral = bluetoothDevices?.find(i => i?.connected);
     if (peripheral) {
-      const dataToWrite = inputValue
-        ? inputValue?.split(',')
+      let dataToWrite = inputValue
+        ? String(inputValue)?.split(',')?.map((i)=>Number(i))
         : [
             220, 1, 3, 2, 0, 0, 0, 0, 6, 4, 5, 0, 8, 0, 7, 8, 1, 1, 1, 1, 1, 1,
             1, 1, 8, 8, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0, 44, 0, 0, 0, 0, 0, 43,
