@@ -16,7 +16,8 @@
     "react-native-ble-plx": "^2.0.3",
     "react-native-device-info": "^10.8.0",
     "react-native-permissions": "^3.8.4",
-    "react-native-quick-base64": "^2.0.6"
+    "react-native-quick-base64": "^2.0.6",
+    "use-debounce": "^9.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

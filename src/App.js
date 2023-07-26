@@ -27,11 +27,10 @@ const App = () => {
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
-  const peripherals = new Map();
   const [isScanning, setIsScanning] = useState(false);
-  const [connected, setConnected] = useState(false);
   const [bluetoothDevices, setBluetoothDevices] = useState([]);
   const scannedDeviceIds = new Map();
+  const [receivedData, setReceivedData] = useState([]);
 
   const requestPermissions = async cb => {
     if (Platform.OS === 'android') {
@@ -94,9 +93,24 @@ const App = () => {
         }
       },
     );
+    let BleManagerDidUpdateValueForCharacteristic =
+      DeviceEventEmitter.addListener(
+        'BleManagerDidUpdateValueForCharacteristic',
+        ({value, peripheral, characteristic, service}) => {
+          // Convert bytes array to string
+          // console.log(value);
+          setReceivedData(prev => [...prev, value]);
+          // return value;
+          // const bytes = new Uint8Array(value); // Example byte array
+          // const decoder = new TextDecoder('utf-8');
+          // const data = bytesToString(value);
+          // console.log(`Received ${data} for characteristic ${characteristic}`);
+        },
+      );
     let stopListener = BleManagerEmitter.addListener(
       'BleManagerStopScan',
       () => {
+        console.log('Scan is stoped.');
         setIsScanning(false);
         setBluetoothDevices(prev => {
           let newArray = prev;
@@ -104,13 +118,13 @@ const App = () => {
             (item, index) => newArray.indexOf(item) === index,
           );
         });
-        console.log('Scan is stopped');
       },
     );
     return () => {
       stopListener.remove();
-      BleManagerDiscoverPeripheral.removeListener(
-        'BleManagerDiscoverPeripheral',
+      BleManagerDiscoverPeripheral.remove('BleManagerDiscoverPeripheral');
+      BleManagerDidUpdateValueForCharacteristic.remove(
+        'BleManagerDidUpdateValueForCharacteristic',
       );
     };
   }, []);
@@ -131,52 +145,61 @@ const App = () => {
     }
   };
 
-  const connectToPeripheral = peripheral => {
+  const connectToPeripheral = async peripheral => {
     if (peripheral.connected) {
-      BleManager.disconnect(peripheral.id).then(() => {
-        peripheral.connected = false;
-        setConnected(false);
-        alert(`Disconnected from ${peripheral.name}`);
-      });
+      await BleManager.disconnect(peripheral?.id);
+      peripheral.connected = false;
+      scannedDeviceIds.set(peripheral.id, peripheral);
+      setBluetoothDevices(Array.from(scannedDeviceIds.values()));
+      alert(`Disconnected from ${peripheral.name}`);
     } else {
-      BleManager.connect(peripheral?.id, {
-        autoconnect: true,
-      })
-        .then(() => {
-          let peripheralResponse = scannedDeviceIds.get(peripheral.id);
-          if (peripheralResponse) {
-            peripheralResponse.connected = true;
-            scannedDeviceIds.set(peripheral.id, peripheralResponse);
-            setConnected(true);
-            setBluetoothDevices(Array.from(scannedDeviceIds.values()));
-          }
-          alert('Connecting to ' + JSON.stringify(peripheral?.name));
-          BleManager.retrieveServices(peripheral.id)
-            .then(peripheralData => {
-              console.log('Peripheral services:', peripheralData);
-              alert('Device is Connected');
-            })
-            .catch(err => {
-              console.log('ffff', err);
-              alert(err);
-            });
-        })
-        .catch(error => {
-          console.log('errrrrrrr', error);
-          alert(error);
-        });
-      /* Read current RSSI value */
-      // setTimeout(() => {
-      //   BleManager.retrieveServices(peripheral.id)
-      //     .then(peripheralData => {
-      //       console.log('Peripheral services:', peripheralData?.connected);
-      //       alert('Device is Connected');
-      //     })
-      //     .catch(err => {
-      //       console.log('ffff', err);
-      //       alert(err);
-      //     });
-      // }, 1000);
+      try {
+        // 'E8:C4:AB:3B:69:B7',
+        // '02366e80-cf3a-11e1-9ab4-0002a5d5c51b',
+        // '340a1b80-cf4b-11e1-ac36-0002a7d5c51b',
+        // '2902',
+        await BleManager.connect(peripheral?.id);
+        await BleManager.retrieveServices(peripheral?.id);
+        peripheral.connected = true;
+        scannedDeviceIds.set(peripheral.id, peripheral);
+        setBluetoothDevices(Array.from(scannedDeviceIds.values()));
+        alert(`connected to ${peripheral.name}`);
+        await BleManager.startNotification(
+          peripheral?.id,
+          '02366e80-cf3a-11e1-9ab4-0002a5d5c51b',
+          '340a1b80-cf4b-11e1-ac36-0002a7d5c51b',
+        );
+      } catch (error) {
+        console.log('error', error);
+      }
+    }
+  };
+  const writingToPeripheral = async () => {
+    const peripheral = bluetoothDevices?.find(i => i?.connected);
+    if (peripheral) {
+      const dataToWrite = [
+        220, 1, 3, 2, 0, 0, 0, 0, 6, 4, 5, 0, 8, 0, 7, 8, 1, 1, 1, 1, 1, 1, 1,
+        1, 8, 8, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0, 44, 0, 0, 0, 0, 0, 43, 255, 255,
+        255, 0, 0, 0, 0, 192, 212, 1, 0, 240, 73, 2, 0, 240, 73, 2, 0, 170, 3,
+        13, 1, 211, 250, 232, 44, 226, 214, 255, 255, 183, 69, 1, 0, 206, 153,
+        5, 0, 247, 0, 4, 0, 164, 113, 178, 63, 4, 0, 152, 0, 1, 2, 3, 0, 3, 8,
+        40, 40, 0, 0, 0, 0, 0, 0, 5, 2, 1, 0, 6, 16, 13, 14, 13, 15, 11, 10, 16,
+        16, 16, 16, 16, 16, 16, 16, 16, 16, 7, 2, 1, 0, 8, 2, 251, 0, 9, 2, 96,
+        39, 10, 2, 1, 16, 11, 2, 17, 7, 22, 6, 7, 0, 96, 39, 96, 39, 23, 2, 120,
+        0, 14, 2, 1, 32, 15, 4, 39, 192, 43, 192, 16, 4, 232, 3, 250, 0, 17, 2,
+        129, 0, 32, 2, 0, 0, 33, 2, 0, 1, 18, 0, 4, 0, 0, 0, 0, 0, 19, 0, 4, 0,
+      ];
+      try {
+        await BleManager?.writeWithoutResponse(
+          peripheral?.id,
+          '02366e80-cf3a-11e1-9ab4-0002a5d5c51b',
+          '340a1b80-cf4b-11e1-ac36-0002a6d5c51b',
+          dataToWrite,
+        );
+        console.log('Write Successfull');
+      } catch (error) {
+        console.log('Write error', error);
+      }
     }
   };
   // render list of bluetooth devices
@@ -221,7 +244,7 @@ const App = () => {
                   textTransform: 'capitalize',
                   color: peripheral.connected ? Colors.white : Colors.black,
                 }}>
-                {peripheral?.connected ? 'Connected' : 'Not Connected'}
+                {peripheral.connected ? 'Connected' : 'Not Connected'}
               </Text>
             </View>
             <View
@@ -248,6 +271,11 @@ const App = () => {
             </View>
           </View>
         </TouchableOpacity>
+        {receivedData?.map((i, idx) => (
+          <Text key={idx} style={{fontSize: 12, color: '#000', margin: 12}}>
+            {JSON.stringify(i)}
+          </Text>
+        ))}
       </>
     );
   };
@@ -280,10 +308,20 @@ const App = () => {
           </View>
           <TouchableOpacity
             activeOpacity={0.5}
-            style={styles.buttonStyle}
+            disabled={isScanning}
+            style={isScanning ? styles?.buttonDStyle : styles?.buttonStyle}
             onPress={startScan}>
-            <Text style={styles.buttonTextStyle}>
+            <Text style={styles?.buttonTextStyle}>
               {isScanning ? 'Scanning...' : 'Scan Bluetooth Devices'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.5}
+            disabled={isScanning}
+            style={isScanning ? styles?.buttonDStyle : styles?.buttonStyle}
+            onPress={writingToPeripheral}>
+            <Text style={styles?.buttonTextStyle}>
+              {isScanning ? 'Writing...' : 'Write to Bluetooth Device'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -308,6 +346,18 @@ const styles = StyleSheet.create({
   },
   buttonStyle: {
     backgroundColor: '#307ecc',
+    borderWidth: 0,
+    color: '#FFFFFF',
+    borderColor: '#307ecc',
+    height: 40,
+    alignItems: 'center',
+    borderRadius: 30,
+    marginLeft: 35,
+    marginRight: 35,
+    marginTop: 15,
+  },
+  buttonDStyle: {
+    backgroundColor: '#C0C0C0',
     borderWidth: 0,
     color: '#FFFFFF',
     borderColor: '#307ecc',
