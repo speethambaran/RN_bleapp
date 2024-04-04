@@ -159,6 +159,7 @@ const App = () => {
         // 'E8:C4:AB:3B:69:B7',
         // '02366e80-cf3a-11e1-9ab4-0002a5d5c51b',
         // '340a1b80-cf4b-11e1-ac36-0002a7d5c51b',
+        // '00002a37-0000-1000-8000-00805f9b34fb'
         // '2902',
         await BleManager.connect(peripheral?.id);
         await BleManager.retrieveServices(peripheral?.id);
@@ -168,8 +169,8 @@ const App = () => {
         alert(`connected to ${peripheral.name}`);
         await BleManager.startNotification(
           peripheral?.id,
-          '02366e80-cf3a-11e1-9ab4-0002a5d5c51b',
-          '340a1b80-cf4b-11e1-ac36-0002a7d5c51b',
+          '0000180d-0000-1000-8000-00805f9b34fb',
+          '00002a37-0000-1000-8000-00805f9b34fb',
         );
       } catch (error) {
         console.log('error', error);
